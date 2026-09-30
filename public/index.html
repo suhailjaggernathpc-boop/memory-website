@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -42,7 +42,6 @@
 
         textarea {
             height: 120px;
-            resize: vertical;
         }
 
         button {
@@ -53,10 +52,6 @@
             cursor: pointer;
         }
 
-        button:hover {
-            background: #333;
-        }
-
         .memory {
             margin-top: 20px;
             padding: 15px;
@@ -64,19 +59,10 @@
             border-radius: 10px;
         }
 
-        .memory h3 {
-            margin-top: 0;
-        }
-
-        .memory p {
-            white-space: pre-wrap;
-        }
-
         .memory img {
             display: block;
             width: 100%;
             max-width: 650px;
-            height: auto;
             margin-top: 15px;
             border-radius: 10px;
         }
@@ -87,22 +73,23 @@
             margin-top: 5px;
         }
 
+        /* DELETE BUTTON */
+
         .delete-button {
-            background: #d62828;
+            background: red;
+            color: white;
             margin-top: 15px;
+            font-weight: bold;
         }
 
         .delete-button:hover {
-            background: #a91f1f;
-        }
-
-        .error {
-            color: red;
+            background: darkred;
         }
 
     </style>
 
 </head>
+
 
 <body>
 
@@ -131,6 +118,7 @@
         Add Memory
     </button>
 
+
     <h2>Saved Memories</h2>
 
     <div id="memories">
@@ -142,44 +130,47 @@
 
 <script>
 
+
 // LOAD MEMORIES
 
 async function loadMemories() {
 
-    const container =
+    const memoriesDiv =
         document.getElementById("memories");
+
 
     try {
 
         const response =
             await fetch("/memories");
 
-        if (!response.ok) {
-
-            throw new Error(
-                "Could not load memories."
-            );
-        }
 
         const memories =
             await response.json();
 
-        container.innerHTML = "";
+
+        memoriesDiv.innerHTML = "";
+
 
         if (memories.length === 0) {
 
-            container.innerHTML =
+            memoriesDiv.innerHTML =
                 "<p>No memories yet.</p>";
 
             return;
         }
 
+
         memories.forEach(function(memory) {
 
-            const div =
+
+            // MEMORY BOX
+
+            const memoryDiv =
                 document.createElement("div");
 
-            div.className = "memory";
+            memoryDiv.className =
+                "memory";
 
 
             // TITLE
@@ -190,7 +181,7 @@ async function loadMemories() {
             title.textContent =
                 memory.title;
 
-            div.appendChild(title);
+            memoryDiv.appendChild(title);
 
 
             // DESCRIPTION
@@ -201,7 +192,7 @@ async function loadMemories() {
             description.textContent =
                 memory.description;
 
-            div.appendChild(description);
+            memoryDiv.appendChild(description);
 
 
             // DATE
@@ -211,14 +202,15 @@ async function loadMemories() {
                 const date =
                     document.createElement("div");
 
-                date.className = "date";
+                date.className =
+                    "date";
 
                 date.textContent =
                     new Date(
                         memory.created_at
                     ).toLocaleString();
 
-                div.appendChild(date);
+                memoryDiv.appendChild(date);
             }
 
 
@@ -233,42 +225,46 @@ async function loadMemories() {
                     memory.image_url;
 
                 image.alt =
-                    "Memory picture";
+                    "Memory image";
 
-                image.loading =
-                    "lazy";
-
-                div.appendChild(image);
+                memoryDiv.appendChild(image);
             }
 
 
+            // =========================
             // DELETE BUTTON
+            // =========================
 
             const deleteButton =
                 document.createElement("button");
 
-            deleteButton.textContent =
-                "🗑️ Delete";
-
             deleteButton.className =
                 "delete-button";
+
+            deleteButton.textContent =
+                "🗑️ Delete";
 
 
             deleteButton.onclick =
                 async function() {
 
-                    const confirmed =
+
+                    const answer =
                         confirm(
                             "Are you sure you want to delete this memory?"
                         );
 
-                    if (!confirmed) {
+
+                    if (!answer) {
+
                         return;
                     }
 
+
                     try {
 
-                        const response =
+
+                        const deleteResponse =
                             await fetch(
                                 "/memories/" + memory.id,
                                 {
@@ -276,24 +272,39 @@ async function loadMemories() {
                                 }
                             );
 
-                        if (response.ok) {
+
+                        if (
+                            deleteResponse.ok
+                        ) {
 
                             alert(
                                 "Memory deleted!"
                             );
 
+
                             loadMemories();
+
 
                         } else {
 
+                            const error =
+                                await deleteResponse.json();
+
+
                             alert(
-                                "Could not delete memory."
+                                "Could not delete memory: " +
+                                (
+                                    error.error ||
+                                    "Unknown error"
+                                )
                             );
                         }
+
 
                     } catch (error) {
 
                         console.error(error);
+
 
                         alert(
                             "Could not connect to the server."
@@ -303,38 +314,64 @@ async function loadMemories() {
                 };
 
 
-            div.appendChild(deleteButton);
+            // ADD DELETE BUTTON TO MEMORY
 
-            container.appendChild(div);
+            memoryDiv.appendChild(
+                deleteButton
+            );
+
+
+            // ADD MEMORY TO PAGE
+
+            memoriesDiv.appendChild(
+                memoryDiv
+            );
 
         });
+
 
     } catch (error) {
 
         console.error(error);
 
-        container.innerHTML =
-            '<p class="error">Could not load memories.</p>';
+
+        memoriesDiv.innerHTML =
+            "<p>Could not load memories.</p>";
     }
 
 }
+
 
 
 // ADD MEMORY
 
 async function addMemory() {
 
+
     const title =
-        document.getElementById("title").value.trim();
+        document
+        .getElementById("title")
+        .value
+        .trim();
+
 
     const description =
-        document.getElementById("description").value.trim();
+        document
+        .getElementById("description")
+        .value
+        .trim();
+
 
     const image =
-        document.getElementById("image").files[0];
+        document
+        .getElementById("image")
+        .files[0];
 
 
-    if (!title || !description) {
+    if (
+        !title ||
+        !description
+    ) {
 
         alert(
             "Please enter a title and description."
@@ -347,10 +384,12 @@ async function addMemory() {
     const formData =
         new FormData();
 
+
     formData.append(
         "title",
         title
     );
+
 
     formData.append(
         "description",
@@ -369,6 +408,7 @@ async function addMemory() {
 
     try {
 
+
         const response =
             await fetch(
                 "/memories",
@@ -377,6 +417,7 @@ async function addMemory() {
                     body: formData
                 }
             );
+
 
         const result =
             await response.json();
@@ -401,18 +442,28 @@ async function addMemory() {
         );
 
 
-        document.getElementById("title").value = "";
+        document
+            .getElementById("title")
+            .value = "";
 
-        document.getElementById("description").value = "";
 
-        document.getElementById("image").value = "";
+        document
+            .getElementById("description")
+            .value = "";
+
+
+        document
+            .getElementById("image")
+            .value = "";
 
 
         loadMemories();
 
+
     } catch (error) {
 
         console.error(error);
+
 
         alert(
             "Could not connect to the server."
@@ -422,9 +473,11 @@ async function addMemory() {
 }
 
 
-// LOAD WHEN PAGE OPENS
+
+// LOAD MEMORIES WHEN PAGE OPENS
 
 loadMemories();
+
 
 </script>
 
