@@ -1,4 +1,4 @@
-require("dotenv").config();
+ require("dotenv").config();
 
 const express = require("express");
 const multer = require("multer");
@@ -6,100 +6,339 @@ const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
-const PORT = 3000;
 
-// Connect to Supabase
+const PORT = process.env.PORT || 3000;
+
+
+// CONNECT TO SUPABASE
+
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
 );
 
-// Store uploaded images in memory temporarily
+
+// IMAGE UPLOAD
+
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 20 * 1024 * 1024
-  }
+
+    storage: multer.memoryStorage(),
+
+    limits: {
+        fileSize: 20 * 1024 * 1024
+    }
+
 });
 
-// Allow JSON
+
 app.use(express.json());
 
-// Serve the website
-app.use(express.static(path.join(__dirname, "public")));
 
-// Get all memories
-app.get("/memories", async (req, res) => {
-  const { data, error } = await supabase
-    .from("memories")
-    .select("*")
-    .order("created_at", { ascending: false });
+// WEBSITE FILES
 
-  if (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
-  }
+app.use(
+    express.static(
+        path.join(__dirname, "public")
+    )
+);
 
-  res.json(data);
-});
 
-// Add a new memory
-app.post("/memories", upload.single("image"), async (req, res) => {
-  try {
-    const { title, description } = req.body;
+// ============================
+// GET ALL MEMORIES
+// ============================
 
-    let imageUrl = null;
+app.get(
+    "/memories",
+    async function(req, res) {
 
-    // Upload picture if one was selected
-    if (req.file) {
-      const fileName =
-        Date.now() + "-" + req.file.originalname.replace(/\s+/g, "-");
+        try {
 
-      const { error: uploadError } = await supabase.storage
-        .from("memory-images")
-        .upload(fileName, req.file.buffer, {
-          contentType: req.file.mimetype,
-          upsert: false
-        });
+            const result =
+                await supabase
+                    .from("memories")
+                    .select("*")
+                    .order(
+                        "created_at",
+                        {
+                            ascending: false
+                        }
+                    );
 
-      if (uploadError) {
-        console.error(uploadError);
-        return res.status(500).json({ error: uploadError.message });
-      }
 
-      const { data: publicUrlData } = supabase.storage
-        .from("memory-images")
-        .getPublicUrl(fileName);
+            if (result.error) {
 
-      imageUrl = publicUrlData.publicUrl;
-    }
+                console.error(
+                    result.error
+                );
 
-    // Save memory in database
-    const { data, error } = await supabase
-      .from("memories")
-      .insert([
-        {
-          title: title,
-          description: description,
-          image_url: imageUrl
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            result.error.message
+                    });
+            }
+
+
+            res.json(
+                result.data
+            );
+
+
+        } catch (error) {
+
+            console.error(error);
+
+            res
+                .status(500)
+                .json({
+                    error:
+                        "Could not load memories."
+                });
+
         }
-      ])
-      .select();
 
-    if (error) {
-      console.error(error);
-      return res.status(500).json({ error: error.message });
     }
+);
 
-    res.json(data[0]);
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Something went wrong." });
-  }
-});
+// ============================
+// ADD MEMORY
+// ============================
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Website running at http://localhost:${PORT}`);
-});
+app.post(
+    "/memories",
+    upload.single("image"),
+    async function(req, res) {
+
+        try {
+
+            const title =
+                req.body.title;
+
+            const description =
+                req.body.description;
+
+
+            let imageUrl = null;
+
+
+            // UPLOAD IMAGE
+
+            if (req.file) {
+
+
+                const fileName =
+                    Date.now() +
+                    "-" +
+                    req.file.originalname
+                        .replace(
+                            /\s+/g,
+                            "-"
+                        );
+
+
+                const uploadResult =
+                    await supabase
+                        .storage
+                        .from(
+                            "memory-images"
+                        )
+                        .upload(
+                            fileName,
+                            req.file.buffer,
+                            {
+                                contentType:
+                                    req.file.mimetype,
+
+                                upsert: false
+                            }
+                        );
+
+
+                if (
+                    uploadResult.error
+                ) {
+
+                    console.error(
+                        uploadResult.error
+                    );
+
+                    return res
+                        .status(500)
+                        .json({
+                            error:
+                                uploadResult
+                                    .error
+                                    .message
+                        });
+                }
+
+
+                const publicUrl =
+                    supabase
+                        .storage
+                        .from(
+                            "memory-images"
+                        )
+                        .getPublicUrl(
+                            fileName
+                        );
+
+
+                imageUrl =
+                    publicUrl
+                        .data
+                        .publicUrl;
+
+            }
+
+
+            // SAVE MEMORY
+
+            const insertResult =
+                await supabase
+                    .from("memories")
+                    .insert([
+                        {
+                            title:
+                                title,
+
+                            description:
+                                description,
+
+                            image_url:
+                                imageUrl
+                        }
+                    ])
+                    .select();
+
+
+            if (
+                insertResult.error
+            ) {
+
+                console.error(
+                    insertResult.error
+                );
+
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            insertResult
+                                .error
+                                .message
+                    });
+            }
+
+
+            res.json(
+                insertResult.data[0]
+            );
+
+
+        } catch (error) {
+
+            console.error(error);
+
+            res
+                .status(500)
+                .json({
+                    error:
+                        "Could not save memory."
+                });
+
+        }
+
+    }
+);
+
+
+// ============================
+// DELETE MEMORY
+// ============================
+
+app.delete(
+    "/memories/:id",
+    async function(req, res) {
+
+        try {
+
+            const id =
+                req.params.id;
+
+
+            console.log(
+                "Deleting memory:",
+                id
+            );
+
+
+            const deleteResult =
+                await supabase
+                    .from("memories")
+                    .delete()
+                    .eq(
+                        "id",
+                        id
+                    );
+
+
+            if (
+                deleteResult.error
+            ) {
+
+                console.error(
+                    deleteResult.error
+                );
+
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            deleteResult
+                                .error
+                                .message
+                    });
+            }
+
+
+            res.json({
+                message:
+                    "Memory deleted successfully"
+            });
+
+
+        } catch (error) {
+
+            console.error(error);
+
+            res
+                .status(500)
+                .json({
+                    error:
+                        "Could not delete memory."
+                });
+
+        }
+
+    }
+);
+
+
+// ============================
+// START SERVER
+// ============================
+
+app.listen(
+    PORT,
+    function() {
+
+        console.log(
+            "Website running on port " +
+            PORT
+        );
+
+    }
+);
