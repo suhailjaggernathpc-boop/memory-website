@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>My Memories</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        input,
+        textarea,
+        button {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+
+        button {
+            background: black;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        .memory {
+            margin-top: 20px;
+            padding: 15px;
+            background: #eeeeee;
+            border-radius: 10px;
+        }
+
+        .memory h3 {
+            margin-top: 0;
+        }
+
+        .memory p {
+            white-space: pre-wrap;
+        }
+
+        .memory img {
+            display: block;
+            width: 100%;
+            max-width: 650px;
+            height: auto;
+            margin-top: 15px;
+            border-radius: 10px;
+        }
+
+        .date {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>📸 My Memories</h1>
+
+    <input
+        id="title"
+        type="text"
+        placeholder="Memory title"
+    >
+
+    <textarea
+        id="description"
+        placeholder="Write about your memory..."
+    ></textarea>
+
+    <input
+        id="image"
+        type="file"
+        accept="image/png, image/jpeg, image/webp"
+    >
+
+    <button onclick="addMemory()">
+        Add Memory
+    </button>
+
+    <h2>Saved Memories</h2>
+
+    <div id="memories">
+        Loading memories...
+    </div>
+
+</div>
+
+
+<script>
+
+async function loadMemories() {
+
+    const container = document.getElementById("memories");
+
+    try {
+
+        const response = await fetch("/memories");
+
+        if (!response.ok) {
+            throw new Error("Could not load memories.");
+        }
+
+        const memories = await response.json();
+
+        container.innerHTML = "";
+
+        if (memories.length === 0) {
+            container.innerHTML = "<p>No memories yet.</p>";
+            return;
+        }
+
+        memories.forEach(function(memory) {
+
+            const div = document.createElement("div");
+
+            div.className = "memory";
+
+
+            // Title
+            const title = document.createElement("h3");
+            title.textContent = memory.title;
+
+            div.appendChild(title);
+
+
+            // Description
+            const description = document.createElement("p");
+            description.textContent = memory.description;
+
+            div.appendChild(description);
+
+
+            // Date
+            if (memory.created_at) {
+
+                const date = document.createElement("div");
+
+                date.className = "date";
+
+                date.textContent =
+                    new Date(memory.created_at).toLocaleString();
+
+                div.appendChild(date);
+            }
+
+
+            // IMAGE
+            if (memory.image_url) {
+
+                const image = document.createElement("img");
+
+                image.src = memory.image_url;
+
+                image.alt = "Memory picture";
+
+                image.loading = "lazy";
+
+                image.onerror = function() {
+
+                    console.log(
+                        "Image could not load:",
+                        memory.image_url
+                    );
+
+                };
+
+                div.appendChild(image);
+            }
+
+
+            container.appendChild(div);
+
+        });
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        container.innerHTML =
+            '<p class="error">Could not load memories.</p>';
+    }
+}
+
+
+async function addMemory() {
+
+    const title =
+        document.getElementById("title").value.trim();
+
+    const description =
+        document.getElementById("description").value.trim();
+
+    const image =
+        document.getElementById("image").files[0];
+
+
+    if (!title || !description) {
+
+        alert("Please enter a title and description.");
+
+        return;
+    }
+
+
+    const formData = new FormData();
+
+    formData.append("title", title);
+
+    formData.append("description", description);
+
+
+    if (image) {
+
+        formData.append("image", image);
+    }
+
+
+    try {
+
+        const response = await fetch("/memories", {
+
+            method: "POST",
+
+            body: formData
+
+        });
+
+
+        const result = await response.json();
+
+
+        if (!response.ok) {
+
+            alert(
+                "Could not save memory: " +
+                (result.error || "Unknown error")
+            );
+
+            return;
+        }
+
+
+        alert("Memory saved! 🎉");
+
+
+        // Clear the form
+        document.getElementById("title").value = "";
+
+        document.getElementById("description").value = "";
+
+        document.getElementById("image").value = "";
+
+
+        // Reload memories
+        loadMemories();
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        alert("Could not connect to the server.");
+
+    }
+}
+
+
+// Load memories when the website opens
+loadMemories();
+
+</script>
+
+</body>
+</html>
