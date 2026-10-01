@@ -10,7 +10,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 
-// CONNECT TO SUPABASE
+// ============================
+// SUPABASE
+// ============================
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -18,23 +20,24 @@ const supabase = createClient(
 );
 
 
+// ============================
 // IMAGE UPLOAD
+// ============================
 
 const upload = multer({
-
     storage: multer.memoryStorage(),
-
     limits: {
         fileSize: 20 * 1024 * 1024
     }
-
 });
 
 
 app.use(express.json());
 
 
-// WEBSITE FILES
+// ============================
+// WEBSITE
+// ============================
 
 app.use(
     express.static(
@@ -44,62 +47,41 @@ app.use(
 
 
 // ============================
-// GET ALL MEMORIES
+// GET MEMORIES
 // ============================
 
-app.get(
-    "/memories",
-    async function(req, res) {
+app.get("/memories", async (req, res) => {
 
-        try {
+    try {
 
-            const result =
-                await supabase
-                    .from("memories")
-                    .select("*")
-                    .order(
-                        "created_at",
-                        {
-                            ascending: false
-                        }
-                    );
+        const { data, error } =
+            await supabase
+                .from("memories")
+                .select("*")
+                .order("created_at", {
+                    ascending: false
+                });
 
-
-            if (result.error) {
-
-                console.error(
-                    result.error
-                );
-
-                return res
-                    .status(500)
-                    .json({
-                        error:
-                            result.error.message
-                    });
-            }
-
-
-            res.json(
-                result.data
-            );
-
-
-        } catch (error) {
+        if (error) {
 
             console.error(error);
 
-            res
-                .status(500)
-                .json({
-                    error:
-                        "Could not load memories."
-                });
-
+            return res.status(500).json({
+                error: error.message
+            });
         }
 
+        res.json(data);
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            error: "Could not load memories."
+        });
     }
-);
+});
 
 
 // ============================
@@ -109,7 +91,7 @@ app.get(
 app.post(
     "/memories",
     upload.single("image"),
-    async function(req, res) {
+    async (req, res) => {
 
         try {
 
@@ -119,7 +101,6 @@ app.post(
             const description =
                 req.body.description;
 
-
             let imageUrl = null;
 
 
@@ -127,23 +108,18 @@ app.post(
 
             if (req.file) {
 
-
                 const fileName =
                     Date.now() +
                     "-" +
-                    req.file.originalname
-                        .replace(
-                            /\s+/g,
-                            "-"
-                        );
+                    req.file.originalname.replace(
+                        /\s+/g,
+                        "-"
+                    );
 
 
-                const uploadResult =
-                    await supabase
-                        .storage
-                        .from(
-                            "memory-images"
-                        )
+                const { error: uploadError } =
+                    await supabase.storage
+                        .from("memory-images")
                         .upload(
                             fileName,
                             req.file.buffer,
@@ -156,101 +132,65 @@ app.post(
                         );
 
 
-                if (
-                    uploadResult.error
-                ) {
+                if (uploadError) {
 
-                    console.error(
-                        uploadResult.error
-                    );
+                    console.error(uploadError);
 
-                    return res
-                        .status(500)
-                        .json({
-                            error:
-                                uploadResult
-                                    .error
-                                    .message
-                        });
+                    return res.status(500).json({
+                        error:
+                            uploadError.message
+                    });
                 }
 
 
-                const publicUrl =
-                    supabase
-                        .storage
-                        .from(
-                            "memory-images"
-                        )
+                const { data: publicUrlData } =
+                    supabase.storage
+                        .from("memory-images")
                         .getPublicUrl(
                             fileName
                         );
 
 
                 imageUrl =
-                    publicUrl
-                        .data
-                        .publicUrl;
-
+                    publicUrlData.publicUrl;
             }
 
 
             // SAVE MEMORY
 
-            const insertResult =
+            const { data, error } =
                 await supabase
                     .from("memories")
                     .insert([
                         {
-                            title:
-                                title,
-
-                            description:
-                                description,
-
-                            image_url:
-                                imageUrl
+                            title: title,
+                            description: description,
+                            image_url: imageUrl
                         }
                     ])
                     .select();
 
 
-            if (
-                insertResult.error
-            ) {
+            if (error) {
 
-                console.error(
-                    insertResult.error
-                );
+                console.error(error);
 
-                return res
-                    .status(500)
-                    .json({
-                        error:
-                            insertResult
-                                .error
-                                .message
-                    });
+                return res.status(500).json({
+                    error: error.message
+                });
             }
 
 
-            res.json(
-                insertResult.data[0]
-            );
-
+            res.json(data[0]);
 
         } catch (error) {
 
             console.error(error);
 
-            res
-                .status(500)
-                .json({
-                    error:
-                        "Could not save memory."
-                });
-
+            res.status(500).json({
+                error: "Could not save memory."
+            });
         }
-
     }
 );
 
@@ -261,7 +201,7 @@ app.post(
 
 app.delete(
     "/memories/:id",
-    async function(req, res) {
+    async (req, res) => {
 
         try {
 
@@ -270,38 +210,59 @@ app.delete(
 
 
             console.log(
-                "Deleting memory:",
+                "Trying to delete memory:",
                 id
             );
 
 
-            const deleteResult =
+            const { data, error } =
                 await supabase
                     .from("memories")
                     .delete()
-                    .eq(
-                        "id",
-                        id
-                    );
+                    .eq("id", id)
+                    .select();
 
 
-            if (
-                deleteResult.error
-            ) {
+            // SUPABASE ERROR
+
+            if (error) {
 
                 console.error(
-                    deleteResult.error
+                    "DELETE ERROR:",
+                    error
                 );
 
-                return res
-                    .status(500)
-                    .json({
-                        error:
-                            deleteResult
-                                .error
-                                .message
-                    });
+                return res.status(500).json({
+                    error:
+                        error.message
+                });
             }
+
+
+            // NOTHING WAS DELETED
+
+            if (
+                !data ||
+                data.length === 0
+            ) {
+
+                console.log(
+                    "No memory was deleted."
+                );
+
+                return res.status(404).json({
+                    error:
+                        "Memory was not deleted. Check the Supabase DELETE policy."
+                });
+            }
+
+
+            // SUCCESS
+
+            console.log(
+                "Memory successfully deleted:",
+                id
+            );
 
 
             res.json({
@@ -312,17 +273,16 @@ app.delete(
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                "DELETE ERROR:",
+                error
+            );
 
-            res
-                .status(500)
-                .json({
-                    error:
-                        "Could not delete memory."
-                });
-
+            res.status(500).json({
+                error:
+                    "Could not delete memory."
+            });
         }
-
     }
 );
 
@@ -333,7 +293,7 @@ app.delete(
 
 app.listen(
     PORT,
-    function() {
+    () => {
 
         console.log(
             "Website running on port " +
